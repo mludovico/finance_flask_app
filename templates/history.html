@@ -1,0 +1,24 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Quote
+{% endblock %}
+
+{% block main %}
+    <table>
+      <tr>
+        <th>Ticker Symbol</th>
+        <th>Shares</th>
+        <th>Price</th>
+        <th>Transacted</th>
+      </tr>
+      {% for entry in history %}
+        <tr>
+          <td>{{ entry.symbol | upper }}</td>
+          <td>{{ entry.amount }}</td>
+          <td>{{ entry.value | usd }}</td>
+          <td>{{ entry.date | dtFormat }}</td>
+        </tr>
+      {% endfor %}
+    </table>
+{% endblock %}

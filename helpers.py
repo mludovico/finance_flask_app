@@ -1,7 +1,7 @@
 import os
 import requests
 import urllib.parse
-
+from datetime import datetime
 from flask import redirect, render_template, request, session
 from functools import wraps
 
@@ -61,3 +61,7 @@ def lookup(symbol):
 def usd(value):
     """Format value as USD."""
     return f"${value:,.2f}"
+
+def dtFormat(value):
+    """Format milliseconds to DateTime"""
+    return datetime.fromtimestamp(value/1000).strftime("%Y-%m-%d %H:%M:%S")

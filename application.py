@@ -1,5 +1,5 @@
 import os
-
+from time import time
 from cs50 import SQL
 from flask import Flask, flash, jsonify, redirect, render_template, request, session
 from flask_session import Session
@@ -7,7 +7,7 @@ from tempfile import mkdtemp
 from werkzeug.exceptions import default_exceptions, HTTPException, InternalServerError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from helpers import apology, login_required, lookup, usd
+from helpers import apology, login_required, lookup, usd, dtFormat
 
 # Configure application
 app = Flask(__name__)
@@ -25,6 +25,17 @@ def after_request(response):
 
 # Custom filter
 app.jinja_env.filters["usd"] = usd
+app.jinja_env.filters["dtFormat"] = dtFormat
+
+flashed_messages = []
+
+def get_flashed_messages():
+    messages = flashed_messages
+    flashed_messages.clear()
+    return messages
+
+# flashed messages function in jinja
+app.jinja_env.globals.update(get_flashed_messages=get_flashed_messages)
 
 # Configure session to use filesystem (instead of signed cookies)
 app.config["SESSION_FILE_DIR"] = mkdtemp()
@@ -44,21 +55,97 @@ if not os.environ.get("API_KEY"):
 @login_required
 def index():
     """Show portfolio of stocks"""
-    return apology("TODO")
-
+    wallets = db.execute("SELECT * FROM wallet WHERE user_id = :user_id", user_id=session.get("user_id"))
+    stocks = []
+    total = 0
+    for wallet in wallets:
+        stockData = lookup(wallet["symbol"])
+        stocks.append(
+            {
+                "symbol": wallet["symbol"],
+                "name": stockData["name"],
+                "amount": wallet["amount"],
+                "price": stockData["price"],
+                "total": float(stockData["price"]) * float(wallet["amount"])
+            }
+        )
+        total += float(stockData["price"]) * float(wallet["amount"])
+    cash = float(
+        db.execute(
+            "SELECT cash FROM users WHERE id = :user_id",
+            user_id=session.get("user_id")
+        )[0]["cash"]
+    )
+    balance = total + cash
+        
+    return render_template("index.html", stocks=stocks, cash=cash, total=total)
 
 @app.route("/buy", methods=["GET", "POST"])
 @login_required
 def buy():
     """Buy shares of stock"""
-    return apology("TODO")
+    if request.method == "POST":
+        if not request.form.get("symbol") or not request.form.get("shares"):
+            return apology("must provide a symbol and a share amount")
+        if int(request.form.get("shares")) < 1:
+            return apology("amount must be positive integer", 403)
+        stockData = lookup(request.form.get("symbol"))
+        if not stockData:
+            return apology("symbol not found", 404)
+        total = stockData["price"] * int(request.form.get("shares"))
+        balance = db.execute("SELECT cash FROM users WHERE id = :id", id=session.get("user_id"))
+        balance = int(balance[0]['cash'])
+        if total > balance:
+            return apology("balance not enough", 403)
+        db.execute("UPDATE users SET cash = :cash WHERE id = :id", cash=balance-total, id=session.get("user_id"))
+        db.execute(
+            """INSERT INTO wallet (
+                user_id,
+                symbol,
+                amount
+            ) VALUES (
+                :userId,
+                :symbol,
+                :amount
+            ) ON CONFLICT(symbol) DO
+                UPDATE SET amount = amount+:amount
+            """,
+            userId=session.get("user_id"),
+            symbol=request.form.get("symbol"),
+            amount=request.form.get("shares")
+        )
+        db.execute(
+            """INSERT INTO history (
+                user_id,
+                symbol,
+                value,
+                amount,
+                date
+            ) VALUES (
+                :userId,
+                :symbol,
+                :value,
+                :amount,
+                :date
+            )
+            """,
+            userId=session.get("user_id"),
+            symbol=request.form.get("symbol"),
+            value=total,
+            amount=request.form.get("shares"),
+            date=int(time()*1000)
+        )
+        return redirect("/")
+    else:
+        return render_template("buy.html")
 
 
 @app.route("/history")
 @login_required
 def history():
     """Show history of transactions"""
-    return apology("TODO")
+    history = db.execute("SELECT * FROM history WHERE user_id = :user_id", user_id=session.get("user_id"))
+    return render_template("history.html", history=history)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -113,7 +200,16 @@ def logout():
 @login_required
 def quote():
     """Get stock quote."""
-    return apology("TODO")
+    if request.method == "POST":
+        if not request.form.get("symbol"):
+            print("Quote symbol " + request.form.get("symbol"))
+            return apology("must provide a ticker symbol", 403)
+        stockData = lookup(request.form.get("symbol").upper())
+        if not stockData:
+            return apology("symbol not found", 404)
+        return render_template("quoted.html", data=stockData)
+    else:
+        return render_template("quote.html")
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -152,7 +248,28 @@ def register():
 @login_required
 def sell():
     """Sell shares of stock"""
-    return apology("TODO")
+    if request.method == "POST":
+        if not request.form.get("symbol") or not request.form.get("shares"):
+            return apology("Bad request", 403)
+        if int(request.form.get("shares")) < 1:
+            return apology("Must provide an amount greater than 0", 403)
+        stocks = db.execute(
+            "SELECT * FROM wallet WHERE user_id = :user_id AND symbol = :symbol",
+            user_id=session.get("user_id"),
+            symbol=request.form.get("symbol")
+        )
+        if len(stocks) < 1:
+            return apology("This symbol does not exist in wallet", 403)
+        if int(request.form.get("shares")) > int(stocks[0]["amount"]):
+            return apology("Wallet doesn't have this amount of shares", 403)
+        return apology("TODO", 200)
+
+    else:
+        stocks = db.execute(
+            "SELECT * FROM wallet WHERE user_id = :user_id",
+            user_id=session.get("user_id"),
+        )
+        return render_template("sell.html", stocks=stocks)
 
 
 def errorhandler(e):

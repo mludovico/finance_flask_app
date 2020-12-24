@@ -22,6 +22,24 @@ nav .navbar-brand .green
     color: #2e944b;
 }
 
+div.blue {
+    background-color: #90c2dc;
+    color: rgb(0, 77, 140);
+    margin-bottom: 1em;
+}
+
+div.yellow {
+    background-color: #dcd390;
+    color: rgb(140, 128, 0);
+    margin-bottom: 1em;
+}
+
+div.red {
+    background-color: #dc9090;
+    color: rgb(140, 0, 0);
+    margin-bottom: 1em;
+}
+
 main .form-control
 {
     /* center form controls */
@@ -44,4 +62,24 @@ main img
 {
     /* constrain images on small screens */
     max-width: 100%;
+}
+
+table {
+    width: 100%;
+    margin-top: 2em;
+}
+
+tr {
+    border-top: 1px solid #eeeeee;
+    border-bottom: 1px solid #eeeeee;
+}
+
+th, td {
+    text-align: start;
+    padding: 0.5em 0;
+}
+
+tfoot tr {
+    border-bottom: none;
+    font-weight: bold;
 }
