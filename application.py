@@ -262,7 +262,11 @@ def sell():
             return apology("This symbol does not exist in wallet", 403)
         if int(request.form.get("shares")) > int(stocks[0]["amount"]):
             return apology("Wallet doesn't have this amount of shares", 403)
-        return apology("TODO", 200)
+        stockData = lookup(request.form.get("symbol"))
+        db.execute(
+            "UPDATE users SET cash = cash+:cash WHERE user_id = :user_id",
+            cash=float()
+        )
 
     else:
         stocks = db.execute(
