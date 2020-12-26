@@ -7,10 +7,27 @@
 {% block main %}
     <form action="/buy" method="post">
         <div class="form-group">
-            <input autocomplete="off" autofocus class="form-control" name="symbol" placeholder="Ticker" type="text">
+            <input
+              autocomplete="off"
+              {% if not symbol %}
+                autofocus
+              {% endif %}
+              class="form-control"
+              name="symbol"
+              placeholder="Ticker"
+              type="text"
+              value="{{ symbol }}"
+            >
         </div>
         <div class="form-group">
-            <input class="form-control" name="shares" placeholder="Amount" type="text">
+            <input
+              class="form-control"
+              name="shares"
+              placeholder="Amount"
+              type="text"
+              {% if symbol %}
+                autofocus
+              {% endif %}>
         </div>
         <button class="btn btn-primary" type="submit">Buy</button>
     </form>

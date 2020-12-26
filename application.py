@@ -131,7 +131,9 @@ def buy():
         flash("Bought!")
         return redirect("/")
     else:
-        return render_template("buy.html")
+      symbol = request.args.get("symbol")
+      print(symbol)
+      return render_template("buy.html", symbol=symbol)
 
 
 @app.route("/history")
@@ -368,7 +370,8 @@ def sell():
             "SELECT * FROM wallet WHERE user_id = :user_id",
             user_id=session.get("user_id"),
         )
-        return render_template("sell.html", stocks=stocks)
+        symbol = request.args.get("symbol")
+        return render_template("sell.html", stocks=stocks, symbol=symbol)
 
 
 def errorhandler(e):

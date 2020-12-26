@@ -20,6 +20,10 @@
           <td>{{ stock.amount }}</td>
           <td>{{ stock.price | usd }}</td>
           <td>{{ stock.total | usd }}</td>
+          <td>
+            <a href="/buy?symbol={{ stock.symbol | upper }}" class="btn btn-success btn-sm">BUY</a>
+            <a href="/sell?symbol={{ stock.symbol | upper }}" class="btn btn-danger btn-sm">SELL</a>
+          </td>
         </tr>
       {% endfor %}
         <tr>
