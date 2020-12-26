@@ -27,16 +27,6 @@ def after_request(response):
 app.jinja_env.filters["usd"] = usd
 app.jinja_env.filters["dtFormat"] = dtFormat
 
-flashed_messages = []
-
-def get_flashed_messages():
-    messages = flashed_messages
-    flashed_messages.clear()
-    return messages
-
-# flashed messages function in jinja
-app.jinja_env.globals.update(get_flashed_messages=get_flashed_messages)
-
 # Configure session to use filesystem (instead of signed cookies)
 app.config["SESSION_FILE_DIR"] = mkdtemp()
 app.config["SESSION_PERMANENT"] = False
@@ -55,7 +45,7 @@ if not os.environ.get("API_KEY"):
 @login_required
 def index():
     """Show portfolio of stocks"""
-    wallets = db.execute("SELECT * FROM wallet WHERE user_id = :user_id", user_id=session.get("user_id"))
+    wallets = db.execute("SELECT * FROM wallet WHERE user_id = :user_id AND amount > 0", user_id=session.get("user_id"))
     stocks = []
     total = 0
     for wallet in wallets:
@@ -76,9 +66,12 @@ def index():
             user_id=session.get("user_id")
         )[0]["cash"]
     )
+    print(total)
+    print(cash)
     balance = total + cash
-        
-    return render_template("index.html", stocks=stocks, cash=cash, total=total)
+    print(balance)
+    
+    return render_template("index.html", stocks=stocks, cash=cash, total=total, balance=balance)
 
 @app.route("/buy", methods=["GET", "POST"])
 @login_required
@@ -111,7 +104,7 @@ def buy():
                 UPDATE SET amount = amount+:amount
             """,
             userId=session.get("user_id"),
-            symbol=request.form.get("symbol"),
+            symbol=request.form.get("symbol").upper(),
             amount=request.form.get("shares")
         )
         db.execute(
@@ -130,11 +123,12 @@ def buy():
             )
             """,
             userId=session.get("user_id"),
-            symbol=request.form.get("symbol"),
-            value=total,
+            symbol=request.form.get("symbol").upper(),
+            value=stockData["price"],
             amount=request.form.get("shares"),
             date=int(time()*1000)
         )
+        flash("Bought!")
         return redirect("/")
     else:
         return render_template("buy.html")
@@ -178,12 +172,48 @@ def login():
         session["user_id"] = rows[0]["id"]
 
         # Redirect user to home page
+        flash("Welcome!")
         return redirect("/")
 
     # User reached route via GET (as by clicking a link or via redirect)
     else:
         return render_template("login.html")
 
+@app.route("/change_password", methods=["GET", "POST"])
+@login_required
+def change_password():
+    """Change user password"""
+
+    user = db.execute("SELECT * FROM users WHERE id = :user_id", user_id=session.get("user_id"))
+    print(user)
+    if request.method == "POST":
+        # Ensure old password was submitted
+        if not request.form.get("old"):
+            return apology("must enter old password", 403)
+        
+        # Ensure old password is correct
+        if not check_password_hash(user[0]["hash"], request.form.get("old")):
+          return apology("incorrect password", 403)
+
+        # Ensure new password was submitted
+        elif not request.form.get("new"):
+            return apology("must enter new password", 403)
+
+        # Ensure confirmation was submitted and equals password
+        elif request.form.get("new") != request.form.get("confirmation"):
+            return apology("new password and confirmation doesn't match", 403)
+
+        # update password
+        db.execute(
+          "UPDATE users set hash = :hash",
+          hash=generate_password_hash(request.form.get("new"))
+        )
+        flash("Password changed!")
+        return redirect("/")
+      
+
+    else:
+      return render_template("change_password.html", user=user[0]["username"])
 
 @app.route("/logout")
 def logout():
@@ -256,7 +286,7 @@ def sell():
         stocks = db.execute(
             "SELECT * FROM wallet WHERE user_id = :user_id AND symbol = :symbol",
             user_id=session.get("user_id"),
-            symbol=request.form.get("symbol")
+            symbol=request.form.get("symbol").upper()
         )
         if len(stocks) < 1:
             return apology("This symbol does not exist in wallet", 403)
@@ -264,9 +294,39 @@ def sell():
             return apology("Wallet doesn't have this amount of shares", 403)
         stockData = lookup(request.form.get("symbol"))
         db.execute(
-            "UPDATE users SET cash = cash+:cash WHERE user_id = :user_id",
-            cash=float()
+            "UPDATE users SET cash = cash+:cash WHERE id = :user_id",
+            cash=float(stockData["price"]) * int(request.form.get("shares")),
+            user_id=session.get("user_id")
         )
+        db.execute(
+          "UPDATE wallet SET amount = amount - :amount WHERE user_id = :user_id AND symbol = :symbol",
+          amount=request.form.get("shares"),
+          user_id=session.get("user_id"),
+          symbol=request.form.get("symbol").upper()
+        )
+        db.execute(
+            """INSERT INTO history (
+                user_id,
+                symbol,
+                value,
+                amount,
+                date
+            ) VALUES (
+                :userId,
+                :symbol,
+                :value,
+                :amount,
+                :date
+            )
+            """,
+            userId=session.get("user_id"),
+            symbol=request.form.get("symbol").upper(),
+            value=stockData["price"],
+            amount=-int(request.form.get("shares")),
+            date=int(time()*1000)
+        )
+        flash("Sold!")
+        return redirect("/")
 
     else:
         stocks = db.execute(
