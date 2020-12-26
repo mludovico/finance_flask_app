@@ -141,6 +141,41 @@ def history():
     history = db.execute("SELECT * FROM history WHERE user_id = :user_id", user_id=session.get("user_id"))
     return render_template("history.html", history=history)
 
+@app.route("/add_cash", methods=["GET", "POST"])
+@login_required
+def add_cash():
+    """Add cash to account"""
+
+    user = db.execute("SELECT * FROM users WHERE id = :user_id", user_id=session.get("user_id"))[0]
+    if request.method == "POST":
+      
+      # Ensure password exists
+      if not request.form.get("password"):
+        return apology("Must provide password", 403)
+      
+      # Ensure password is correct
+      if not check_password_hash(user["hash"], request.form.get("password")):
+        return apology("Incorrect password", 403)
+      
+      # Ensure value exists
+      if not request.form.get("value"):
+        return apology("Must provide a value", 403)
+
+      try:
+        float(request.form.get("value"))
+      except:
+        return apology("Invalid value", 403)
+
+      # Add cash amount
+      db.execute(
+        "UPDATE users SET cash = cash+:cash WHERE id = :user_id",
+        cash=float(request.form.get("value")),
+        user_id=user["id"]
+      )
+      flash("Cash added!")
+      return redirect("/")
+    else:
+      return render_template("add_cash.html")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
